@@ -1,5 +1,5 @@
 {
-  "name": "@hosea/electron-test-kit",
+  "name": "@hoseadev/electron-test-kit",
   "version": "0.1.0",
   "description": "Playwright e2e primitives for unpackaged Electron apps: launch, userData isolation, bridge/CSP assertions",
   "type": "module",

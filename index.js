@@ -1,5 +1,5 @@
 /**
- * @hosea/electron-test-kit
+ * @hoseadev/electron-test-kit
  *
  * Playwright Electron e2e 测试原语。
  *

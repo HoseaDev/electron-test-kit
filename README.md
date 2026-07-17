@@ -1,4 +1,4 @@
-# @hosea/electron-test-kit
+# @hoseadev/electron-test-kit
 
 基于 Playwright 的 Electron e2e 测试原语。纯 ESM、零构建步骤。
 
@@ -24,7 +24,7 @@
 
 ```jsonc
 // package.json (devDependencies)
-"@hosea/electron-test-kit": "file:../electron-test-kit",
+"@hoseadev/electron-test-kit": "file:../electron-test-kit",
 "@playwright/test": "^1.60.0"
 ```
 
@@ -45,7 +45,7 @@ if (userDataDirOverride) {
 
 ```ts
 import { test, expect } from '@playwright/test'
-import { launchElectron, expectNodeIntegrationDisabled } from '@hosea/electron-test-kit'
+import { launchElectron, expectNodeIntegrationDisabled } from '@hoseadev/electron-test-kit'
 
 test('app boots', async () => {
   const { app, window } = await launchElectron({

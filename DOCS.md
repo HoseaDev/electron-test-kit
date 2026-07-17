@@ -94,7 +94,7 @@ Playwright 驱动的 Electron 应用 e2e 测试工具包。这份文档分两部
 
 ```jsonc
 // 你项目的 package.json → devDependencies
-"@hosea/electron-test-kit": "file:../electron-test-kit",
+"@hoseadev/electron-test-kit": "file:../electron-test-kit",
 "@playwright/test": "^1.60.0"
 ```
 
@@ -109,14 +109,14 @@ pnpm install
 把 `electron-test-kit/` 推到一个 Git 仓库，然后：
 
 ```jsonc
-"@hosea/electron-test-kit": "git+https://your-git-host/electron-test-kit.git#v0.1.0"
+"@hoseadev/electron-test-kit": "git+https://your-git-host/electron-test-kit.git#v0.1.0"
 ```
 
 免搭 npm registry，适合公司内网共享。用 tag 锁版本。
 
 ### 方式 C：对外发布（npm）
 
-见[开发篇 §13](#13-自测与发布)。发布后就是普通 `pnpm add -D @hosea/electron-test-kit`。
+见[开发篇 §13](#13-自测与发布)。发布后就是普通 `pnpm add -D @hoseadev/electron-test-kit`。
 
 ---
 
@@ -341,7 +341,7 @@ await expectIpcRejected(
 // test/e2e/_helpers.ts
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { launchElectron, type LaunchedApp } from '@hosea/electron-test-kit'
+import { launchElectron, type LaunchedApp } from '@hoseadev/electron-test-kit'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..')

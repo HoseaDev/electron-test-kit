@@ -55,7 +55,7 @@ try {
   // 5. 消费者冒烟：从**安装的包**（不是源码）import，launch + bridge
   const electronPath = createRequire(path.join(KIT_ROOT, 'package.json'))('electron')
   const smoke = `
-import { launchElectron, expectBridgeExposed, callBridgeMethod } from '@hosea/electron-test-kit'
+import { launchElectron, expectBridgeExposed, callBridgeMethod } from '@hoseadev/electron-test-kit'
 const h = await launchElectron({
   entry: './fixtures/basic-app/main.cjs',
   cwd: process.cwd(),
