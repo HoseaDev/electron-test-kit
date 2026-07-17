@@ -1,0 +1,13 @@
+<!-- fixture 渲染页。带 CSP meta 供 expectMetaCspContains 测试。
+     script-src 放开 'unsafe-inline' 只为让下面这段测试用的内联脚本能跑，
+     default-src / object-src 仍严格，足够做断言测试。 -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'" />
+<body>
+  <div id="root">fixture ok</div>
+  <script>
+    document.title = new URLSearchParams(location.search).get('title') || 'fixture'
+    // 主世界放一个 null 值，供 expectBridgeExposed 的 null 负例测试
+    window.nullBridge = null
+  </script>
+</body>

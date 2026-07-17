@@ -1,0 +1,71 @@
+{
+  "name": "@hosea/electron-test-kit",
+  "version": "0.1.0",
+  "description": "Playwright e2e primitives for unpackaged Electron apps: launch, userData isolation, bridge/CSP assertions",
+  "type": "module",
+  "license": "MIT",
+  "author": "HoseaDev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HoseaDev/electron-test-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HoseaDev/electron-test-kit/issues"
+  },
+  "homepage": "https://github.com/HoseaDev/electron-test-kit#readme",
+  "keywords": [
+    "electron",
+    "playwright",
+    "e2e",
+    "testing",
+    "test-kit"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "DOCS.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.types.json",
+    "test": "playwright test",
+    "pack:check": "npm pack --dry-run",
+    "pack:consumer": "node test/pack-consumer.mjs",
+    "prepublishOnly": "npm run typecheck && npm run pack:check"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40 <2",
+    "playwright": ">=1.40 <2"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "electron": "^33.0.0",
+    "playwright": "^1.55.0",
+    "typescript": "^5.6.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  }
+}

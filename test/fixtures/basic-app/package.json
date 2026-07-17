@@ -1,0 +1,6 @@
+{
+  "name": "etk-fixture-basic-app",
+  "private": true,
+  "description": "Minimal Electron app used to self-test electron-test-kit. Not published.",
+  "main": "main.cjs"
+}
