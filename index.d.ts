@@ -51,6 +51,16 @@ export declare function expectBridgeExposed(window: Page, bridgeKey: string): Pr
 
 export declare function expectNodeIntegrationDisabled(window: Page): Promise<void>
 
+/**
+ * 在主进程侧断言每个 BrowserWindow 实际生效的 webPreferences。
+ * 不传 expected 时用安全基线 { sandbox: true, contextIsolation: true, nodeIntegration: false }。
+ * 只比较列出的键。
+ */
+export declare function expectWebPreferences(
+  app: ElectronApplication,
+  expected?: Record<string, boolean>,
+): Promise<void>
+
 export interface CspRules {
   mustInclude?: string[]
   mustNotInclude?: string[]
@@ -83,6 +93,11 @@ export interface RejectOptions {
    * 属性通常被剥离，只有 name/message 可靠存活。
    */
   errorMatches?: string | RegExp
+  /**
+   * 任何异常都算失败（而非拒绝）。用于按设计只返回值、从不抛异常的通道：
+   * 抛了就是实现 bug，不能伪装成安全拒绝。与 errorMatches 互斥。
+   */
+  throwIsFailure?: boolean
   /** 断言失败时的提示信息 */
   message?: string
   /** 挂住的 IPC 超时（毫秒） */

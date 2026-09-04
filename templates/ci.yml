@@ -1,0 +1,58 @@
+# electron-test-kit 消费者项目的 GitHub Actions 模板。拷到 .github/workflows/e2e.yml。
+# Linux runner 跑 Electron 需要 xvfb（虚拟显示）+ 一组系统 GUI 库。
+# Electron 自带 Chromium，不需要 `playwright install`。
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # 需要提交 lockfile，否则 --frozen-lockfile 直接失败
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install xvfb + Electron deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+            libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+            libgbm1 libpango-1.0-0 libcairo2 libasound2t64 libgtk-3-0
+
+      # TODO: 换成你的构建命令，产物路径要和 _helpers.ts 的 MAIN_ENTRY 一致
+      - name: Build
+        run: pnpm exec vite build --mode=test
+
+      # CI=true 让 _helpers.ts 里的 noSandbox 生效（受限容器需要）
+      - name: Run e2e
+        run: xvfb-run -a pnpm exec playwright test
+        env:
+          CI: 'true'
+
+      - name: Upload failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 14

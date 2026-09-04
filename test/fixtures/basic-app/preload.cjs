@@ -13,10 +13,4 @@ contextBridge.exposeInMainWorld('testAPI', {
   throwType: () => {
     throw new TypeError('boom-type')
   },
-  // 抛带 code 的错误（测 errorCode 路径）
-  throwCoded: () => {
-    const e = new Error('coded failure')
-    e.code = 'EPERM'
-    throw e
-  },
 })

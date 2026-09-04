@@ -130,6 +130,19 @@ ready?: (window: Page, app: ElectronApplication) => Promise<void>
 
 ---
 
+## L3 之后：只按消费者证据加（2026-09 补记）
+
+L3 达成后 kit 本体停止主动加功能，新能力只从真实消费者暴露的问题里来。第一轮（0.2.0）加了两项，都能指出证据：
+
+- `expectWebPreferences`：DOCS 自己承认 `expectNodeIntegrationDisabled` 是表层探测、"应在主进程侧断言 webPreferences"，却没提供这个断言，等于把最重要的安全检查留成作业。
+- `expectIpcRejected` 的 `throwIsFailure`：FlowKit 8 条安全测试里 7 条的通道按设计只返回值、从不抛错，旧 API 无法表达"抛了就是 bug"，内部 TypeError 会伪装成拒绝。
+
+另外给新项目补了 `templates/`（配置、helper、首个 e2e、CI 四个文件），把接入压缩到"装包、加四行、拷四个文件"。它是可拷贝的起点，不是生成器。
+
+下一轮功能的来源应该是**第二个真实消费者**接入时暴露的问题，而不是这份清单之外的想象。
+
+---
+
 ## 到 L3 为止，明确砍掉（不要碰）
 
 npm publish、独立仓库、changelog 自动化、三平台 CI、Electron 版本矩阵、ESM+CJS 双构建、TS 源码重写、asar、electron-builder 安装包测试、签名公证、自动更新测试、截图/视觉回归系统、登录 mock 框架、API fixture DSL、Redis helper、自定义 reporter、插件系统、构建工具自动探测、Vite/Webpack/Forge 配置生成器。

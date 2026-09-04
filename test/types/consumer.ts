@@ -8,6 +8,7 @@ import {
   expectMainWindowExists,
   expectBridgeExposed,
   expectNodeIntegrationDisabled,
+  expectWebPreferences,
   expectMetaCspContains,
   callBridgeMethod,
   expectIpcRejected,
@@ -39,6 +40,8 @@ export async function scenario(): Promise<void> {
   await expectMainWindowExists(app)
   await expectBridgeExposed(window, 'electronAPI')
   await expectNodeIntegrationDisabled(window)
+  await expectWebPreferences(app)
+  await expectWebPreferences(app, { sandbox: true, webSecurity: true })
   await expectMetaCspContains(window, { mustInclude: ["default-src 'self'"], mustNotInclude: [] })
 
   // 泛型返回类型
@@ -52,6 +55,12 @@ export async function scenario(): Promise<void> {
     errorMatches: /denied/,
     timeout: 3000,
     message: 'should be denied',
+  })
+
+  // 返回值拒绝型通道：抛异常即失败
+  await expectIpcRejected(window, 'electronAPI', ['storage', 'set'], ['../x', 'v'], {
+    rejectIf: (r) => r === false,
+    throwIsFailure: true,
   })
 
   await close()

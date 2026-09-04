@@ -7,6 +7,7 @@
  *   splash   先开 splash 窗口，500ms 后开 "main-window"（测 selectWindow）
  *   nowindow 永不开窗（测 firstWindow 超时清理）
  *   crash    主进程 ready 前 exit(1)（测启动失败清理）
+ *   insecure 故意用不安全 webPreferences 开窗（测 expectWebPreferences 负例）
  */
 const { app, BrowserWindow } = require('electron')
 const path = require('node:path')
@@ -28,13 +29,14 @@ if (MODE === 'crash') {
 app.on('window-all-closed', () => {}) // 不自动退出，交给测试 close
 
 function makeWindow(title) {
+  const secure = { sandbox: true, contextIsolation: true, nodeIntegration: false }
+  // insecure 模式刻意反着配，供 expectWebPreferences 的负例测试
+  const insecure = { sandbox: false, contextIsolation: false, nodeIntegration: true }
   const win = new BrowserWindow({
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
+      ...(MODE === 'insecure' ? insecure : secure),
     },
   })
   // 用 query 把标题传给页面，让页面自己设 document.title（稳定，不会被
@@ -51,5 +53,5 @@ app.whenReady().then(() => {
     setTimeout(() => makeWindow('main-window'), 500)
     return
   }
-  makeWindow('fixture')
+  makeWindow(MODE === 'insecure' ? 'insecure' : 'fixture')
 })

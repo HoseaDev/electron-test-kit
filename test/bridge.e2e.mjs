@@ -7,6 +7,7 @@ import {
   launchElectron,
   expectBridgeExposed,
   expectNodeIntegrationDisabled,
+  expectWebPreferences,
   expectMetaCspContains,
   callBridgeMethod,
   expectIpcRejected,
@@ -45,6 +46,30 @@ test('expectNodeIntegrationDisabled：sandbox 渲染进程无 Node 全局', asyn
   }
 })
 
+test('expectWebPreferences：安全基线通过、insecure fixture 失败、空 expected 报错', async () => {
+  const h = await launchElectron(launchOpts())
+  try {
+    await expectWebPreferences(h.app) // 默认基线
+    await expectWebPreferences(h.app, { nodeIntegration: false }) // 只比列出的键
+    await assertFails(
+      () => expectWebPreferences(h.app, { nodeIntegration: true }),
+      '与实际配置相反的预期应失败',
+    )
+    await assertFails(() => expectWebPreferences(h.app, {}), '空 expected 应报错')
+  } finally {
+    await h.close()
+  }
+  // 负例：fixture 用不安全 webPreferences 开窗，默认基线必须 FAIL
+  const bad = await launchElectron(launchOpts({ env: { FIXTURE_MODE: 'insecure' } }))
+  try {
+    await assertFails(() => expectWebPreferences(bad.app), 'insecure 窗口不应通过安全基线')
+    // 反向声明则通过，证明读到的是真实配置而不是常量
+    await expectWebPreferences(bad.app, { sandbox: false, contextIsolation: false, nodeIntegration: true })
+  } finally {
+    await bad.close()
+  }
+})
+
 test('expectMetaCspContains：命中/未命中/排除', async () => {
   const h = await launchElectron(launchOpts())
   try {
@@ -77,7 +102,7 @@ test('callBridgeMethod：echo 返回值、空 methodPath 报错、缺失方法�
   }
 })
 
-test('expectIpcRejected：业务拒绝 / errorMatches / errorCode / 假绿防线', async () => {
+test('expectIpcRejected：业务拒绝 / errorMatches / 假绿防线', async () => {
   const h = await launchElectron(launchOpts())
   try {
     // 1) 返回失败对象 → rejectIf 判定
@@ -110,6 +135,37 @@ test('expectIpcRejected：业务拒绝 / errorMatches / errorCode / 假绿防线
     await assertFails(
       () => expectIpcRejected(h.window, 'testAPI', ['echo'], ['x']),
       '返回正常值应视为未拒绝',
+    )
+  } finally {
+    await h.close()
+  }
+})
+
+test('expectIpcRejected throwIsFailure：返回值拒绝通过、抛异常 FAIL、与 errorMatches 互斥', async () => {
+  const h = await launchElectron(launchOpts())
+  try {
+    // 按设计只返回值的通道：返回 {success:false} → 拒绝成立
+    await expectIpcRejected(h.window, 'testAPI', ['reject'], [], {
+      throwIsFailure: true,
+      rejectIf: (r) => typeof r === 'object' && r !== null && r.success === false,
+    })
+    // 同样的通道若抛了异常（内部 bug）→ 必须 FAIL，不能伪装成拒绝
+    await assertFails(
+      () =>
+        expectIpcRejected(h.window, 'testAPI', ['throwType'], [], {
+          throwIsFailure: true,
+          rejectIf: () => true,
+        }),
+      'throwIsFailure 下任何异常都应 fail',
+    )
+    // 两个互斥选项同时给 → 用法错误
+    await assertFails(
+      () =>
+        expectIpcRejected(h.window, 'testAPI', ['reject'], [], {
+          throwIsFailure: true,
+          errorMatches: /x/,
+        }),
+      'throwIsFailure 与 errorMatches 同时传应报用法错误',
     )
   } finally {
     await h.close()

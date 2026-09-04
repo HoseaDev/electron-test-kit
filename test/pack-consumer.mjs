@@ -40,9 +40,10 @@ try {
     JSON.stringify({ name: 'etk-consumer', private: true, type: 'module' }, null, 2),
   )
 
-  // 3. 真安装 tarball + peer 依赖（不装 electron，借用 kit 的）
-  console.log('[pack-consumer] npm install tarball + peers ...')
-  run('npm', ['install', '--no-audit', '--no-fund', tgzPath, '@playwright/test', 'playwright'], {
+  // 3. 真安装 tarball + @playwright/test（和 README 第 1 步完全一致：不单独装
+  //    playwright，验证它能经 @playwright/test 被解析到；不装 electron，借用 kit 的）
+  console.log('[pack-consumer] npm install tarball + @playwright/test ...')
+  run('npm', ['install', '--no-audit', '--no-fund', tgzPath, '@playwright/test'], {
     cwd: consumerDir,
     stdio: 'inherit',
   })

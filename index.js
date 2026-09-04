@@ -293,6 +293,47 @@ export async function expectNodeIntegrationDisabled(window) {
 }
 
 /**
+ * 在主进程侧断言每个 BrowserWindow 的 webPreferences 满足预期。
+ *
+ * 这是 expectNodeIntegrationDisabled（渲染进程表层探测）的严格版：直接读主进程里
+ * webContents 实际生效的配置，而不是在页面里探测有没有泄漏全局。
+ *
+ * 默认预期是安全基线 `{ sandbox: true, contextIsolation: true, nodeIntegration: false }`；
+ * 传 expected 可覆盖或追加其他布尔项（如 webSecurity、allowRunningInsecureContent）。
+ * 只比较 expected 里列出的键。
+ *
+ * @param {import('playwright').ElectronApplication} app
+ * @param {Record<string, boolean>} [expected]
+ */
+export async function expectWebPreferences(app, expected) {
+  const want = expected ?? { sandbox: true, contextIsolation: true, nodeIntegration: false }
+  const keys = Object.keys(want)
+  if (keys.length === 0) {
+    throw new Error('[electron-test-kit] expectWebPreferences 的 expected 不能为空对象')
+  }
+  const actual = await app.evaluate(({ BrowserWindow }, keys) => {
+    return BrowserWindow.getAllWindows().map((win) => {
+      const wc = win.webContents
+      // getLastWebPreferences 返回该 webContents 实际生效的合并配置（含 Electron 默认值）
+      const prefs = typeof wc.getLastWebPreferences === 'function' ? wc.getLastWebPreferences() : {}
+      const picked = {}
+      for (const k of keys) picked[k] = prefs[k]
+      return { id: win.id, title: win.getTitle(), prefs: picked }
+    })
+  }, keys)
+  expect(actual.length, 'expectWebPreferences: 应至少有一个 BrowserWindow').toBeGreaterThan(0)
+  const violations = []
+  for (const w of actual) {
+    for (const k of keys) {
+      if (w.prefs[k] !== want[k]) {
+        violations.push(`窗口#${w.id}("${w.title}") ${k}=${safeStringify(w.prefs[k])}，期望 ${want[k]}`)
+      }
+    }
+  }
+  expect(violations, 'webPreferences 不满足预期').toEqual([])
+}
+
+/**
  * 断言页面的 CSP `<meta>` 存在且满足包含/排除规则。
  *
  * 命名诚实：这是**字符串包含检查**，不解析 CSP directive，也不检查响应头 CSP。
@@ -403,10 +444,13 @@ export async function callBridgeMethod(window, bridgeKey, methodPath, args = [],
  * 断言某个 IPC/bridge 调用被拒绝。判定顺序：
  * 1. 方法不存在 → 直接 fail（防拼错静默通过）。
  * 2. 调用抛异常：
+ *    - 若给了 throwIsFailure: true，任何异常都 fail——用于"按设计只返回值、从不
+ *      抛异常"的通道（如返回 {success:false}），抛了就是实现 bug 而非拒绝；
  *    - 若给了 errorMatches，异常 message 必须匹配才算"拒绝"（否则一个内部
  *      TypeError 会伪装成安全拒绝造成假绿）；
- *    - 没给时，任何异常都算拒绝（向后兼容）——**安全关键**的断言建议传
- *      errorMatches，把拒绝钉死在预期错误消息上。
+ *    - 两者都没给时，任何异常都算拒绝（向后兼容）——**安全关键**的断言务必
+ *      二选一：通道靠抛错拒绝就传 errorMatches，靠返回值拒绝就传 throwIsFailure。
+ *    - 两者同时传是矛盾的，直接抛用法错误。
  * 3. 调用返回值：由 rejectIf 判定；没给 rejectIf 则 fail（返回了值就不是拒绝）。
  *
  * 注：只用 message 匹配，不用 error.code——错误跨 contextBridge / IPC 边界时
@@ -416,11 +460,17 @@ export async function callBridgeMethod(window, bridgeKey, methodPath, args = [],
  * @param {string} bridgeKey
  * @param {string[]} methodPath
  * @param {unknown[]} args
- * @param {{rejectIf?: (result: unknown) => boolean, errorMatches?: string | RegExp, message?: string, timeout?: number}} [options]
+ * @param {{rejectIf?: (result: unknown) => boolean, errorMatches?: string | RegExp, throwIsFailure?: boolean, message?: string, timeout?: number}} [options]
  */
 export async function expectIpcRejected(window, bridgeKey, methodPath, args, options = {}) {
   assertMethodPath(methodPath)
-  const { rejectIf, errorMatches, message, timeout } = options
+  const { rejectIf, errorMatches, throwIsFailure = false, message, timeout } = options
+  if (throwIsFailure && errorMatches !== undefined) {
+    throw new Error(
+      '[electron-test-kit] expectIpcRejected: throwIsFailure 与 errorMatches 互斥——' +
+        '通道靠抛错拒绝用 errorMatches，靠返回值拒绝用 throwIsFailure + rejectIf。',
+    )
+  }
   const outcome = await invokeBridge(window, bridgeKey, methodPath, args, timeout)
   const label = message ?? `${bridgeKey}.${methodPath.join('.')} 应当被拒绝`
 
@@ -432,6 +482,12 @@ export async function expectIpcRejected(window, bridgeKey, methodPath, args, opt
   }
 
   if (outcome.threw) {
+    if (throwIsFailure) {
+      throw new Error(
+        `[electron-test-kit] ${label}：该通道按设计不应抛异常，但抛出了 "${outcome.error}"` +
+          '（这是实现 bug，不算拒绝）',
+      )
+    }
     if (errorMatches !== undefined) {
       const msg = String(outcome.error ?? '')
       const ok = errorMatches instanceof RegExp ? errorMatches.test(msg) : msg.includes(errorMatches)

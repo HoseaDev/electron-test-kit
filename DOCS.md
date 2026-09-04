@@ -75,7 +75,7 @@ Playwright 驱动的 Electron 应用 e2e 测试工具包。这份文档分两部
 - **Node >= 20**
 - **纯 ESM** 消费：本包无 CJS 构建，用 `import` 引用（不能 `require`）
 - 你的项目是 **Electron 应用**，且能构建出**未打包**的主进程入口文件（如 `dist-electron/main/index.js`）
-- 安装了 `@playwright/test` 和 `playwright`（本包的 peer 依赖，支持区间 `>=1.40 <2`）
+- 安装了 `@playwright/test`（peer 依赖，支持区间 `>=1.40 <2`；`playwright` 由它带入，不必单独装）
 - 主进程支持 `--user-data-dir` 开关（见[核心概念](#4-必须理解的-4-个核心概念)，一段代码的事）——profile 隔离依赖它
 - **Linux CI 需要 xvfb**（虚拟显示）+ 一组系统 GUI 库（见 [§8](#8-ci-集成)）
 - **多窗口 / splash 应用**需自己传 `selectWindow` 和 `ready`（见 [§5](#5-api-参考)），kit 默认只取首个窗口
@@ -86,37 +86,34 @@ Playwright 驱动的 Electron 应用 e2e 测试工具包。这份文档分两部
 
 ## 3. 安装（三种方式）
 
-按"给谁用"选一种。
+按"给谁用"选一种。绝大多数项目用方式 A。
 
-### 方式 A：同仓库 / 同机多项目（`file:` 依赖）
-
-最简单，FlowKit 现在就是这么用的。把 `electron-test-kit/` 放在能被相对路径引用到的地方：
-
-```jsonc
-// 你项目的 package.json → devDependencies
-"@hoseadev/electron-test-kit": "file:../electron-test-kit",
-"@playwright/test": "^1.60.0"
-```
+### 方式 A：npm 安装（推荐，FlowKit 现在就是这么用的）
 
 ```bash
-pnpm install
+pnpm add -D @hoseadev/electron-test-kit @playwright/test
+# npm i -D / yarn add -D 同理
 ```
 
-**注意包管理器差异**：pnpm 的 `file:` 依赖是**安装期拷贝**（软链到 `.pnpm` 下的一份副本），改了 kit 源码必须 `pnpm install` 才生效；npm/yarn 的 `file:` 多为真软链，改完直接生效。跨包管理器最稳的做法是：**改完 kit 一律 `pnpm install` 一次再跑测试**。
+`playwright` 是本包的可选 peer，由 `@playwright/test` 带入，pnpm / npm 都能正确解析，不必单独声明。
 
-### 方式 B：团队共享（Git 依赖）
+装完把 [`templates/`](./templates/) 里的四个文件拷进项目（`playwright.config.ts`、`test/e2e/_helpers.ts`、`test/e2e/app.e2e.ts`、`.github/workflows/e2e.yml`），按 `TODO` 改路径和 bridge key，再给主进程加 `--user-data-dir` 支持（[核心概念③](#4-必须理解的-4-个核心概念)），就能跑第一条 e2e。装包后也可以从 `node_modules/@hoseadev/electron-test-kit/templates/` 拷。
 
-把 `electron-test-kit/` 推到一个 Git 仓库，然后：
+### 方式 B：Git 依赖（内网共享、不想经 npm）
 
 ```jsonc
-"@hoseadev/electron-test-kit": "git+https://your-git-host/electron-test-kit.git#v0.1.0"
+"@hoseadev/electron-test-kit": "git+https://github.com/HoseaDev/electron-test-kit.git#v0.2.0"
 ```
 
-免搭 npm registry，适合公司内网共享。用 tag 锁版本。
+用 tag 锁版本。
 
-### 方式 C：对外发布（npm）
+### 方式 C：`file:` 引用（只在本地开发 kit 本身时用）
 
-见[开发篇 §13](#13-自测与发布)。发布后就是普通 `pnpm add -D @hoseadev/electron-test-kit`。
+```jsonc
+"@hoseadev/electron-test-kit": "file:../electron-test-kit"
+```
+
+**注意包管理器差异**：pnpm 的 `file:` 依赖是**安装期拷贝**（软链到 `.pnpm` 下的一份副本），改了 kit 源码必须 `pnpm install` 才生效；npm/yarn 的 `file:` 多为真软链，改完直接生效。另外 `file:` 会掩盖 exports / files / peer 配置问题，改完 kit 要用 `pnpm pack:consumer` 验一次真实打包边界。
 
 ---
 
@@ -186,7 +183,7 @@ await launchElectron({ entry, cwd, noSandbox: process.env.CI === 'true' })
 
 ## 5. API 参考
 
-包导出 7 个函数：1 个启动器 + 6 个断言/调用原语（外加一个废弃别名 `expectStrictCSP`）。全部是 async。
+包导出 8 个函数：1 个启动器 + 7 个断言/调用原语（外加一个废弃别名 `expectStrictCSP`）。全部是 async。
 
 ### `launchElectron(options)`
 
@@ -205,7 +202,7 @@ await launchElectron({ entry, cwd, noSandbox: process.env.CI === 'true' })
 | `recordMainProcessLogs` | boolean | `false` | 尽力收集 `app.process()` 的 stdout/stderr 到 `mainLogs`。**注意**：Playwright+Electron 下主进程 console 输出多走继承 fd 而非 pipe，常抓不到——best-effort，勿依赖 |
 | `firstWindowTimeout` | number | `30000` | 等首个窗口的超时（毫秒） |
 | `executablePath` | string | 从 `cwd` 项目解析 | 显式指定 Electron 二进制路径 |
-| `selectWindow` | `(windows: Page[]) => Page \| Promise<Page>` | 取首个窗口 | 多窗口 / splash 应用选主窗口 |
+| `selectWindow` | `(windows: Page[], app) => Page \| Promise<Page>` | 取首个窗口 | 多窗口 / splash 应用选主窗口；第二参 `app` 可 `waitForEvent('window')` 等晚开的主窗 |
 | `ready` | `(window: Page, app) => Promise<void>` | 等 `domcontentloaded` | 自定义就绪判定 |
 
 **返回** `Promise<LaunchedApp>`：
@@ -269,7 +266,23 @@ await expectBridgeExposed(window, 'electronAPI')
 await expectNodeIntegrationDisabled(window)
 ```
 
-> **诚实边界**：这是一个**表层探测**，只检查这 4 个常见 Node 全局，**不等于**证明了 `sandbox` / `contextIsolation` 配置完全正确。要严格验证隔离配置，应在主进程侧断言 `webPreferences`。
+> **诚实边界**：这是一个**表层探测**，只检查这 4 个常见 Node 全局，**不等于**证明了 `sandbox` / `contextIsolation` 配置完全正确。严格验证用下面的 `expectWebPreferences`，两者互补：一个看主进程配置，一个看渲染进程有没有漏。
+
+### `expectWebPreferences(app, expected?)`
+
+在**主进程侧**读每个 `BrowserWindow` 的 `webContents.getLastWebPreferences()`，断言实际生效的配置满足预期。不传 `expected` 时用安全基线：
+
+```ts
+await expectWebPreferences(app) // 等价于 { sandbox: true, contextIsolation: true, nodeIntegration: false }
+```
+
+只比较 `expected` 里列出的键，可以追加其他布尔项：
+
+```ts
+await expectWebPreferences(app, { sandbox: true, webSecurity: true, allowRunningInsecureContent: false })
+```
+
+失败消息会列出每个不达标的窗口（id、标题、实际值），多窗口应用一次看全。`expected` 传空对象会报用法错误，避免"什么都没比却绿了"。
 
 ### `expectMetaCspContains(window, rules?)`
 
@@ -303,22 +316,32 @@ const dir = await callBridgeMethod<string>(
 
 1. **方法不存在** → 直接 fail（防拼错静默通过）。
 2. **调用抛异常**：
+   - 给了 `throwIsFailure: true` 时，任何异常都 **fail**。用于按设计只返回值、从不抛错的通道：抛了就是实现 bug，不是拒绝；
    - 给了 `errorMatches`（子串或正则，匹配错误 message）时，异常**必须匹配**才算拒绝；
-   - 没给时，任何异常都算拒绝（向后兼容）。
+   - 两者都没给时，任何异常都算拒绝（向后兼容的宽松行为）；
+   - 两者同时给是矛盾的，直接抛用法错误。
 3. **调用返回值**：由 `rejectIf` 谓词判定（如 `{success:false}` 或 `false`）；没给 `rejectIf` 则 fail。
 
 可选 `options.timeout` 同 `callBridgeMethod`。
 
-> **安全关键断言应传 `errorMatches`**，把拒绝钉死在预期错误消息上。否则一个内部 `TypeError`（比如你把方法调错了）会伪装成"安全拒绝"造成假绿。只匹配 message——错误跨 contextBridge/IPC 边界时 `code` 等自定义属性通常被剥离，只有 name/message 可靠存活，所以本包不提供 errorCode 匹配。
+> **安全关键断言务必在 `errorMatches` 和 `throwIsFailure` 里二选一**，按通道的拒绝方式定：靠抛错拒绝的传 `errorMatches`，靠返回值拒绝的传 `throwIsFailure` + `rejectIf`。否则一个内部 `TypeError`（比如你把方法调错了）会伪装成"安全拒绝"造成假绿。这个坑是真实消费者（FlowKit）的 8 条安全测试里 7 条踩过的。
+>
+> 只匹配 message——错误跨 contextBridge/IPC 边界时 `code` 等自定义属性通常被剥离，只有 name/message 可靠存活，所以本包不提供 errorCode 匹配。
 
 ```ts
-// 断言读 /etc/passwd 被拒,且拒绝来自预期错误(而非内部 bug)
+// 抛错型通道：拒绝必须来自预期错误
+await expectIpcRejected(
+  window, 'electronAPI', ['app', 'getPath'], ['home'],
+  { errorMatches: /not allowed/, message: 'getPath("home") should be denied' },
+)
+
+// 返回值型通道：{success:false} 算拒绝，抛异常算 bug
 await expectIpcRejected(
   window, 'electronAPI', ['fs', 'readFile'], ['/etc/passwd'],
   {
-    errorMatches: /denied|forbidden|not allowed/,
-    // 或按返回值判定: rejectIf: (r) => (r as any)?.success === false,
-    message: 'reading /etc/passwd should be denied',
+    throwIsFailure: true,
+    rejectIf: (r) => (r as any)?.success === false,
+    message: 'reading /etc/passwd should be denied by path-guard',
   },
 )
 ```
@@ -402,9 +425,8 @@ test('every panel renders without errors', async () => {
   // 禁用 CSS 动画,避免 animate-in 中间帧导致的判定抖动
   await window.addStyleTag({ content: '*{transition:none!important;animation:none!important}' })
 
-  const errors: string[] = []
-  window.on('pageerror', (e) => errors.push(e.message))
-  window.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+  // templates/_helpers.ts 里的收集器：pageerror + console.error
+  const { errors, reset, stop } = collectRendererErrors(window)
 
   const ids: string[] = await window.evaluate(() =>
     [...document.querySelectorAll('[data-testid^="item-"]')]
@@ -413,19 +435,23 @@ test('every panel renders without errors', async () => {
   const failures: Record<string, string[]> = {}
   try {
     for (const id of ids) {
-      errors.length = 0
+      reset()
       await window.locator(`[data-testid="item-${id}"]`).click()
-      await window.waitForTimeout(150)
+      // 等面板自己的标志元素，不要 waitForTimeout 固定睡——CI 变慢就抖
+      await window.locator(`[data-testid="panel-${id}"]`).waitFor({ state: 'visible' })
       if (errors.length) failures[id] = [...errors]
     }
     expect(failures).toEqual({})   // 空 = 所有面板都干净
   } finally {
+    stop()
     await app.close()
   }
 })
 ```
 
 > FlowKit 用这个模式一次抓到了一个真实崩溃（某工具的空 `<SelectItem value="">` 导致白屏）。数据驱动的价值就在这——新增条目零成本纳入覆盖。
+>
+> 如果你的 mock 对未声明的请求统一返回成功（见配方 2），记得在测试末尾断言"未声明请求"列表在预期集合内，否则某个面板悄悄调了没 mock 的接口拿到 null，测试照样绿。
 
 ### 配方 4：安全回归
 
@@ -466,7 +492,7 @@ try {
 
 ## 7. 配置 playwright.config.ts
 
-关键点：只跑 `*.e2e.ts`、串行（`workers: 1`）、给足超时。
+直接拷 [`templates/playwright.config.ts`](./templates/playwright.config.ts)。关键点：只跑 `*.e2e.ts`、串行（`workers: 1`）、给足超时。
 
 ```ts
 import { defineConfig } from '@playwright/test'
@@ -496,6 +522,8 @@ export default defineConfig({
 ---
 
 ## 8. CI 集成
+
+直接拷 [`templates/ci.yml`](./templates/ci.yml) 到 `.github/workflows/`，改构建命令即可。下面是它的精简版，解释每步为什么：
 
 Linux runner 上跑 Electron 需要 xvfb（虚拟显示）+ 一堆系统库。GitHub Actions 示例：
 
@@ -555,11 +583,17 @@ jobs:
 
 ```
 electron-test-kit/
-├── index.js       # 全部实现(纯 ESM JavaScript)
-├── index.d.ts     # 手写类型声明
-├── package.json   # exports 映射 + peerDependencies
-├── README.md      # 5 分钟上手
-└── DOCS.md        # 本文件
+├── index.js            # 全部实现(纯 ESM JavaScript)
+├── index.d.ts          # 手写类型声明
+├── package.json        # exports 映射 + peerDependencies + files 白名单
+├── templates/          # 消费者项目拷贝用的 4 个起点文件（随包发布）
+├── test/
+│   ├── fixtures/basic-app/   # 最小 Electron fixture（FIXTURE_MODE 切状态）
+│   ├── *.e2e.mjs             # kit 自测（launch / bridge / windows）
+│   ├── pack-consumer.mjs     # 真 tarball 消费者验证
+│   └── types/consumer.ts     # d.ts 一致性 typecheck
+├── .github/workflows/ci.yml  # Linux + xvfb 自测
+├── README.md / DOCS.md / CHANGELOG.md / ROADMAP.md
 ```
 
 ### `launchElectron` 内部做了什么
@@ -570,11 +604,11 @@ electron-test-kit/
 2. **校验入口存在**：`entry` 不存在直接抛人话错误（"先构建"），避免 Playwright 抛难懂的底层错。
 3. **组装参数**：若开启隔离且调用方没自带 `--user-data-dir`，`mkdtempSync` 建临时目录并加进 args；仅当 `noSandbox: true` 时加 `--no-sandbox`（默认不加）。
 4. **launch**：`electron.launch({ executablePath, args, cwd, env })`。launch 本身失败时清理临时目录再抛。
-5. **注册清理**：`app.on('close')` 里 `rmSync` 临时目录（正常路径由调用方 `close` 触发）；清理失败写进 `mainLogs` 不完全静默。
+5. **注册清理**：在底层进程的 `exit` 事件上挂 `cleanupDir`（`rmSync` 临时目录）。挂在进程退出而不是 `app.close()` 上，是因为将死的 Chromium 还会往 userData 写 `DevToolsActivePort` 等文件，先删目录会"删完又被重建"；也因此调用方直接调 `app.close()` 不经过 `handle.close()` 同样能清理。清理失败写进 `mainLogs` 不完全静默。
 6. **可选收集日志**：`app.process().stdout/stderr` 的 data 事件推进 `mainLogs`。
 7. **选窗口 + 等就绪**：有 `selectWindow` 则先 `firstWindow` 确保有窗口再交给它挑，否则用 `firstWindow`；有 `ready` 则调它，否则 `waitForLoadState('domcontentloaded')`。**这步失败会 `close()` 进程 + 删临时目录，绝不泄漏。**
 
-`close()` 用一个 `closed` 标志实现幂等，调多次只真正关一次。真实的清理保证是：**正常关闭时删目录，且启动过程任一步失败也删目录**——不是"无论测试怎么退出都自动清理"（进程被强杀等极端情况仍可能残留临时目录，由 OS tmp 回收）。
+`close()` 把关闭过程 memoize 成一个 promise 实现幂等：串行或并发多次调用共享同一结果、错误一致传播。它先 `app.close()`，进程若仍未退出（"从未开窗"的应用 `app.close()` 可能不终止进程）就 `SIGKILL` 兜底，再等进程真正退出（最多 5 秒）后删目录，所以 `await close()` 返回时目录已确定清理。真实的清理保证是：**正常关闭时删目录，且启动过程任一步失败也删目录**——不是"无论测试怎么退出都自动清理"（测试 runner 本身被强杀等极端情况仍可能残留临时目录，由 OS tmp 回收）。
 
 ### 断言原语的实现套路
 
@@ -605,7 +639,9 @@ export async function expectTitleMatches(window, pattern) {
 export declare function expectTitleMatches(window: Page, pattern: RegExp): Promise<void>
 ```
 
-**第三步**：在 `README.md` 的 API 表格加一行。
+**第三步**：在 `test/bridge.e2e.mjs`（或对应文件）加自测，**正例和负例都要**；fixture 缺能力就给 `test/fixtures/basic-app/` 加一个 `FIXTURE_MODE` 或 bridge 方法。没有负例的断言等于没测过"它会失败"。
+
+**第四步**：在 `test/types/consumer.ts` 调一次新函数（typecheck 防 d.ts 漂移），在 `README.md` 的 API 表格和本文 §5 各加一条，`CHANGELOG.md` 记一行。
 
 原则：
 - 断言函数只做**一件事**，消息要能自解释（失败时不用翻代码就知道哪错了）。
@@ -639,30 +675,32 @@ pnpm pack:check       # tarball 只含预期文件（快，纯文件列表）
 pnpm pack:consumer    # 打真 tarball，全新 npm install 后 import+launch（验打包边界）
 ```
 
-CI（`.github/workflows/electron-test-kit.yml`）在 Linux + xvfb 上跑这几件。
+CI（`.github/workflows/ci.yml`）在 Linux + xvfb 上跑这几件。
 `pack:consumer` 是 L3 关键：`file:` 依赖会掩盖 exports/files/peer 缺失，只有
 真安装 tarball 才暴露。
 改完 kit 必做这一套；FlowKit 那类真实消费者的 e2e 是额外的集成验证。
 
 **fixture 的状态开关**（`FIXTURE_MODE` 环境变量）：`normal` / `splash` /
-`nowindow` / `crash`——分别制造正常、splash+主窗、永不开窗、主进程崩溃，
+`nowindow` / `crash` / `insecure`——分别制造正常、splash+主窗、永不开窗、主进程崩溃、不安全 webPreferences，
 用来测各条清理和窗口选择路径。加新断言时顺手给 fixture 补对应能力。
 
-### 发布到 npm（方式 C）
+### 发布到 npm
 
-发布前补齐：
+`package.json` 的 `license` / `repository` / `files` / `exports` / `prepublishOnly` 已配好，`prepublishOnly` 会依次跑 typecheck、pack:check 和全部自测，任一失败发布中止。发一版的流程：
 
-1. `package.json` 加 `repository`、`license`、`prepublishOnly`：
-   ```jsonc
-   "license": "MIT",
-   "repository": { "type": "git", "url": "..." },
-   "scripts": { "prepublishOnly": "node -e \"require('./index.js')\"" }
-   ```
-2. 加 `LICENSE` 文件。
-3. `files` 字段已限定只发 `index.js` / `index.d.ts` / `README.md`（当前 package.json 已配）。
-4. 校验打包内容：`npm pack --dry-run`。
-5. 发布：`npm publish`（私有 registry 加 `--registry`，或用 GitHub Packages）。
-6. 版本遵循 semver：加断言=minor，改签名/删函数=major，修 bug=patch。
+```bash
+# 1. 改代码 + 在 CHANGELOG.md 顶部加一节
+# 2. bump 版本（加断言=minor，改签名/删函数=major，修 bug/文档=patch）
+npm version patch        # 或 minor / major，会顺手打 git tag
+# 3. 发布（prepublishOnly 自动跑 typecheck + pack:check + test）
+npm publish
+# 4. 推代码和 tag
+git push && git push --tags
+```
+
+`files` 白名单只发 `index.js` / `index.d.ts` / `templates/` / 三个 md / LICENSE，`pnpm pack:check` 可预览。
+
+---
 
 ## 14. FAQ
 
@@ -681,6 +719,3 @@ A：e2e 天生慢。原则是"能单测的别放 e2e"。e2e 只留启动冒烟�
 **Q：`file:` 依赖改了 kit 没生效？**
 A：看包管理器。pnpm 的 `file:` 是安装期拷贝，改完必须 `pnpm install` 才同步；npm/yarn 多为真软链，直接生效。保险起见改完 kit 一律 `pnpm install` 一次。
 
----
-
-有补充需求（比如加个 fixture app 做 kit 自测、或整理成独立发布仓库），告诉我。

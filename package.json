@@ -1,6 +1,6 @@
 {
   "name": "@hoseadev/electron-test-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Playwright e2e primitives for unpackaged Electron apps: launch, userData isolation, bridge/CSP assertions",
   "type": "module",
   "license": "MIT",
@@ -34,19 +34,21 @@
   "files": [
     "index.js",
     "index.d.ts",
+    "templates",
     "README.md",
     "DOCS.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.types.json",
+    "typecheck": "tsc -p tsconfig.types.json && tsc -p tsconfig.templates.json",
     "test": "playwright test",
     "pack:check": "npm pack --dry-run",
     "pack:consumer": "node test/pack-consumer.mjs",
-    "prepublishOnly": "npm run typecheck && npm run pack:check"
+    "prepublishOnly": "npm run typecheck && npm run pack:check && npm test"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.40 <2",
@@ -59,6 +61,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
+    "@types/node": "^20.19.43",
     "electron": "^33.0.0",
     "playwright": "^1.55.0",
     "typescript": "^5.6.0"
